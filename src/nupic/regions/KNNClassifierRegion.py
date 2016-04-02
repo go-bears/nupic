@@ -26,7 +26,7 @@
 This file defines the k Nearest Neighbor classifier region.
 """
 import numpy
-from PyRegion import PyRegion
+from nupic.bindings.regions.PyRegion import PyRegion
 from nupic.algorithms import KNNClassifier
 from nupic.bindings.math import Random
 
@@ -51,7 +51,8 @@ class KNNClassifierRegion(PyRegion):
         singleNodeOnly=True,
         inputs=dict(
           categoryIn=dict(
-            description='Vector of categories of the input sample',
+            description='Vector of zero or more category indices for this input'
+                         'sample. -1 implies no category.',
             dataType='Real32',
             count=0,
             required=True,
@@ -232,7 +233,7 @@ class KNNClassifierRegion(PyRegion):
             dataType="Byte",
             count=0,
             constraints='enum: norm, rawOverlap, pctOverlapOfLarger, '
-              'pctOverlapOfProto',
+              'pctOverlapOfProto, pctOverlapOfInput',
             defaultValue='norm',
             accessMode='ReadWrite'),
 
@@ -284,6 +285,18 @@ class KNNClassifierRegion(PyRegion):
             constraints='',
             defaultValue=1,
             accessMode='Create'),
+
+          minSparsity=dict(
+            description="If useSparseMemory is set, only vectors with sparsity"
+                        " >= minSparsity will be stored during learning. A value"
+                        " of 0.0 implies all vectors will be stored. A value of"
+                        " 0.1 implies only vectors with at least 10% sparsity"
+                        " will be stored",
+            dataType='Real32',
+            count=1,
+            constraints='',
+            defaultValue=0.0,
+            accessMode='ReadWrite'),
 
           sparseThreshold=dict(
             description='If sparse memory is used, input variables '
@@ -386,16 +399,6 @@ class KNNClassifierRegion(PyRegion):
             defaultValue=0 ,
             accessMode='ReadWrite'),
 
-          doSelfValidation=dict(
-            description='A boolean flag that determines whether or'
-                        'not the KNNClassifier should perform partitionID-based'
-                        'self-validation during the finishLearning() step.',
-            dataType='UInt32',
-            count=1,
-            constraints='bool',
-            defaultValue=None,
-            accessMode='ReadWrite'),
-
           keepAllDistances=dict(
             description='Whether to store all the protoScores in an array, '
                         'rather than just the ones for the last inference. '
@@ -472,10 +475,10 @@ class KNNClassifierRegion(PyRegion):
                useAuxiliary=0,
                justUseAuxiliary=0,
                clVerbosity=0,
-               doSelfValidation=False,
                replaceDuplicates=False,
                cellsPerCol=0,
-               maxStoredPatterns=-1
+               maxStoredPatterns=-1,
+               minSparsity=0.0
                ):
 
     self.version = KNNClassifierRegion.__VERSION__
@@ -517,7 +520,8 @@ class KNNClassifierRegion(PyRegion):
         verbosity=clVerbosity,
         replaceDuplicates=replaceDuplicates,
         cellsPerCol=cellsPerCol,
-        maxStoredPatterns=maxStoredPatterns
+        maxStoredPatterns=maxStoredPatterns,
+        minSparsity=minSparsity
     )
 
     # Initialize internal structures
@@ -542,12 +546,6 @@ class KNNClassifierRegion(PyRegion):
 
     # Debugging
     self.verbosity = clVerbosity
-
-    # Boolean controlling whether or not the
-    # region should perform partitionID-based
-    # self-validation during the finishLearning()
-    # step.
-    self.doSelfValidation = doSelfValidation
 
     # Taps
     self._tapFileIn = None
@@ -579,8 +577,8 @@ class KNNClassifierRegion(PyRegion):
 
     self._knn = KNNClassifier.KNNClassifier(**self.knnParams)
 
-    for x in ('_partitions', '_useAuxialiary', '_doSphering',
-              '_scanInfo', '_protoScores', 'doSelfValidation'):
+    for x in ('_partitions', '_useAuxiliary', '_doSphering',
+              '_scanInfo', '_protoScores'):
       if not hasattr(self, x):
         setattr(self, x, None)
 
@@ -591,6 +589,11 @@ class KNNClassifierRegion(PyRegion):
     if 'version' not in state:
       self.__dict__.update(state)
     elif state['version'] == 1:
+
+      # Backward compatibility
+      if "doSelfValidation" in state:
+        state.pop("doSelfValidation")
+
       knnState = state['_knn_state']
       del state['_knn_state']
 
@@ -654,6 +657,11 @@ class KNNClassifierRegion(PyRegion):
   def clear(self):
 
     self._knn.clear()
+
+
+  def getAlgorithmInstance(self):
+    """Returns instance of the underlying KNNClassifier algorithm object."""
+    return self._knn
 
 
   def getParameter(self, name, index=-1):
@@ -723,8 +731,6 @@ class KNNClassifierRegion(PyRegion):
     @param value -- the value to which the parameter is to be set.
     """
     if name == "learningMode":
-      if int(value) and not self.learningMode:
-        self._restartLearning()
       self.learningMode = bool(int(value))
       self._epoch = 0
     elif name == "inferenceMode":
@@ -749,8 +755,6 @@ class KNNClassifierRegion(PyRegion):
     elif name == "clVerbosity":
       self.verbosity = value
       self._knn.verbosity = value
-    elif name == "doSelfValidation":
-      self.doSelfValidation = value
     else:
       return PyRegion.setParameter(self, name, index, value)
 
@@ -825,7 +829,7 @@ class KNNClassifierRegion(PyRegion):
     self._samples = numpy.concatenate((self._samples, numpy.atleast_2d(inputVector)), axis=0)
     self._labels += [trueCatIndex]
 
-    # Add the parition ID
+    # Add the partition ID
     if self._partitions is None:
       self._partitions = []
     if partition is None:
@@ -887,7 +891,6 @@ class KNNClassifierRegion(PyRegion):
     # Read the partition ID.
     if "partitionIn" in inputs:
       assert len(inputs["partitionIn"]) == 1, "Must have exactly one link to partition input."
-      #partInput = inputs["partitionIn"][0].wvector()
       partInput = inputs['partitionIn']
       assert len(partInput) == 1, "Partition input element count must be exactly 1."
       partition = int(partInput[0])
@@ -953,8 +956,6 @@ class KNNClassifierRegion(PyRegion):
         probabilities = numpy.ones(numScores) / numScores
       else:
         probabilities = scores / total
-      #print "probabilities:", probabilities
-      #import pdb; pdb.set_trace()
 
 
       # -------------------------------------------------------------------
@@ -1086,15 +1087,6 @@ class KNNClassifierRegion(PyRegion):
     return scores / total
 
 
-  def _restartLearning(self):
-    """
-    Currently, we allow learning mode to be "re-started" after being
-    ended, but only if PCA and sphering (if any) operations have
-    already been completed (for the sake of simplicity.)
-    """
-    self._knn.restartLearning()
-
-
   def _finishLearning(self):
     """Does nothing. Kept here for API compatibility """
     if self._doSphering:
@@ -1105,15 +1097,6 @@ class KNNClassifierRegion(PyRegion):
     # Compute leave-one-out validation accuracy if
     # we actually received non-trivial partition info
     self._accuracy = None
-    if self.doSelfValidation:
-      #partitions = self._knn._partitionIdList
-      #if len(set(partitions)) > 1:
-      if self._knn._partitionIdArray is not None:
-        numSamples, numCorrect = self._knn.leaveOneOutTest()
-        if numSamples:
-          self._accuracy = float(numCorrect) / float(numSamples)
-          print "Leave-one-out validation: %d of %d correct ==> %.3f%%" % \
-                 (numCorrect, numSamples, self._accuracy * 100.0)
 
 
   def _finishSphering(self):

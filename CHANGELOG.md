@@ -1,5 +1,108 @@
 # Changelog
 
+## 0.5.1
+
+* Improves SDR classifier and tests
+* Modify the continuous online learning test
+* Add 3 tests on multiple item prediction
+* Fix test_pFormatArray
+* Implement SDR classifier in NuPIC
+* Make the 'arrayTypes' list more informative
+* Add getParameter/setParameter support for Bool and BoolArray
+* Improved anomaly params (from NAB)
+* Added minSparsity option
+* Get the encoder's outputWidth via parameter
+* Use nupic.core encoders from nupic via the Network API
+* Fix bugs and inconsistencies in the custom region demo
+* Adds BINDINGS_VERSION envvar to wheel filename (for iterative builds)
+
+## 0.5.0
+
+* Removes references to FastTemporalMemory.
+* Lower TM epsilon threshold for compatibility.
+* Add documentation for the Monitor Mixins
+* Removed FastTemporalMemory from nupic
+* Update temporal memory compatibility test to use C++ TM.
+* Sort segments before iterating for compatibility with C++
+* Sort unpredictedActiveColumns before iterating for compatibility with C++
+
+## 0.4.5
+
+* This release is just to sync with nupic.bindings 0.3.1.
+
+## 0.4.4
+
+* Botched release (sorry!)
+
+## 0.4.3
+
+* Updating to proper core sha
+
+## 0.4.2
+
+* Using official release version of bindings for nupic release.
+
+## 0.4.1
+
+* Manualy update of nupic.bindings dev version after botched release attempt
+
+## 0.4.0
+
+* Updated hello_tm.py to use accessors
+* Updated TP_shim.py to use accessors Updated `columnForCell` and `_validateCell` in FastTemporalMemory to conform to their docstrings, which is needed for the change to TP_shim.py
+* Updated temporal memory monitor mixin to use accessors
+* Updated temporal_memory_test.py to use accessor methods.
+* Added accessors to temporal_memory.py
+* Change temporalImp to tm_py for both networks and add comment about it being a temporary value until C++ TM is implemented
+* Refactored to remove common code between network_checkpoint_test.py and temporal_memory_compatibility_test.py
+* Use named constants from nupic.data.fieldmeta in aggregator module instead of naked constants.
+* Fix AttributeError: 'TPShim' object has no attribute 'topDownCompute'
+* Support more parameters in TPShim
+* Serialize remaining fields in CLAModel using capnproto
+* Enforce pyproj==1.9.3 in requirements.txt
+* Use FastCLAClassifier read class method instead of instance method
+* Have CLAClassifierFactory.read take just the proto object
+* Add capnp serialization to CLAClassifierRegion
+* Add capnp serialization to SPRegion
+
+## 0.3.6
+
+* Windows support
+* Serialization work
+* Moved SWIG out into nupic.core
+* Major build changes
+
+## 0.3.5
+
+* Raise explicit exception if user passes non-str path
+* SP: simplify local inhibition
+* SP: adapt tests, sort winning columns output
+* SP: simplify active columns assignment
+* SP: simplify global inhibition
+* file Rename as hello_tm.py and modifications in comments
+
+## 0.3.4
+
+* Added src/nupic/frameworks/opf/common_models/cluster_params.py and supporting files from numenta-apps htmengine. A separate numenta-apps PR will remove this code from htmengine.
+* fixes #2592
+* fix for #2265
+* fix for bug #2265
+* Fixup Dockerfile to install nupic.bindings, and other cleanup
+* Adding C++ compiler requirement to README.
+* Fix for test failure
+* Fixed stream definition reference error.
+* Reduce default reestimation period.
+* Remove greedy reestimation of distribution
+* Pointing README to proper bindings version.
+* Continuing work on 0.3.4.dev0.
+* removing a test that depends on nupic.vision
+* PCA_Node test: some fixes, WIP
+* formatting
+* test for PCANode region
+* remove Pillow from requirements.txt as it was used for vision only
+* fix merge mistake in csv file
+* move test from PCANode to nupic.vision unittest
+
 ## 0.3.3
 
 * Include additional file types in MANIFEST.in, consistent with setup.py
